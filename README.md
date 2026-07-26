@@ -1,248 +1,138 @@
-```markdown
+# Structured Router Agent
 
-\# 🛡️ Enterprise AI: Agentic Support Router \& Structured Data Extractor
+LangChain Core v0.1 | Pydantic v2 Schema Enforcement | Llama 3.3 70B Versatile | Streamlit
 
+A production-grade agentic ticket routing and data extraction system. It takes unstructured customer support messages and converts them into strictly validated JSON that downstream systems, databases, and APIs can consume without parsing errors.
 
+---
 
-!\[AI Stack](https://img.shields.io/badge/LangChain-Core%20v0.1-blue?logo=langchain) !\[Validation](https://img.shields.io/badge/Pydantic-v2\_Schema\_Enforcement-red?logo=pydantic) !\[Model](https://img.shields.io/badge/Model-Llama\_3.3\_70B\_Versatile-orange?logo=meta) !\[Frontend](https://img.shields.io/badge/Streamlit-UI-green?logo=streamlit)
+## Problem and Solution
 
+In production, LLMs output conversational, non-deterministic text. Paragraphs, markdown formatting, and floating strings break downstream software. If an API expects an integer for a dollar amount and the model outputs "$149 dollars", the system crashes.
 
+This project addresses three common failure modes:
 
-An production-grade \*\*Agentic Ticket Routing and Data Extraction System\*\* designed to bridge the gap between unpredictable Large Language Model (LLM) text outputs and rigid enterprise databases/APIs.
+1. Hallucination and syntax leakage. Pydantic v2 schemas coupled with native LLM tool calling force deterministic JSON contracts. Incorrect data types or conversational filler are suppressed at the validation layer.
+2. Monolithic token waste. Instead of stuffing a single prompt with dozens of extraction schemas, the pipeline uses a two-stage routing architecture to isolate context windows and reduce input token overhead.
+3. Model routing optimization. A modular routing decision engine categorizes unstructured inputs and evaluates urgency before activating domain-specific structured extractors.
 
+---
 
-
-\---
-
-
-
-\## 🎯 The Engineering Problem \& Solution
-
-In enterprise production environments, LLMs inherently output conversational, non-deterministic text (e.g., Markdown, floating strings) that breaks downstream software systems, databases, and automated APIs.
-
-
-
-\*\*This system addresses three critical failure modes of standard Generative AI:\*\*
-
-1\. \*\*Hallucination \& Syntax Leakage:\*\* Utilizes \*\*Pydantic v2 schemas\*\* coupled with native LLM function/tool calling to force deterministic JSON contracts. Incorrect data types or conversational fluff are completely suppressed.
-
-2\. \*\*Monolithic Token Waste (Prompt Stuffing):\*\* Instead of evaluating massive prompts with dozens of extraction schemas simultaneously, the pipeline employs a \*\*Two-Stage Routing Architecture\*\* to isolate context windows and minimize input token overhead.
-
-3\. \*\*Model Routing Optimization:\*\* Implements a modular routing decision engine that first categorizes unstructured inputs and computes urgency before activating domain-specific structured extractors.
-
-
-
-\---
-
-
-
-\## 🏛️ Architecture Pipeline
-
-
+## Architecture
 
 ```text
-
-\[ Unstructured Customer Email ]
-
-&#x20;             │
-
-&#x20;             ▼
-
-&#x20;   ┌──────────────────┐
-
-&#x20;   │  AI Router Agent │  ──(Enforces: RouteDecision Pydantic Schema)
-
-&#x20;   └──────────────────┘
-
-&#x20;             │
-
-&#x20;    ┌────────┴────────┐
-
-&#x20;    ▼                 ▼
-
-\[ Category: Billing ] \[ Category: Tech Bug ]
-
-&#x20;    │                 │
-
-&#x20;    ▼                 ▼
-
-┌───────────────┐ ┌────────────────────┐
-
-│ Billing Schema│ │ Tech Bug Schema    │ ──(Enforces Domain-Specific Types:
-
-└───────────────┘ └────────────────────┘    Floats, Literals, Arrays)
-
-&#x20;    │                 │
-
-&#x20;    ▼                 ▼
-
-\[ Strictly Validated Production JSON Payload ]
-
+[ Unstructured Customer Email ]
+              |
+              v
+    +------------------+
+    |  AI Router Agent |  -- (Enforces: RouteDecision Pydantic Schema)
+    +------------------+
+              |
+     +--------+--------+
+     v                 v
+[ Category: Billing ] [ Category: Tech Bug ]
+     |                 |
+     v                 v
++---------------+ +----------------------+
+| Billing Schema| | Tech Bug Schema      | -- (Enforces Domain-Specific Types:
++---------------+ +----------------------+    Floats, Literals, Arrays)
+     |                 |
+     v                 v
+[ Strictly Validated Production JSON Payload ]
 ```
 
+---
 
+## Tech Stack and Decisions
 
-\---
-
-
-
-\## 🛠️ Technical Stack \& Architectural Decisions
-
-
-
-| Component | Technology | Engineering Rationale |
-
+| Component | Technology | Rationale |
 | :--- | :--- | :--- |
+| Validation Layer | Pydantic v2 | Acts as a deterministic firewall. Enforces strict types (Literal, Optional, float, arrays) so runtime exceptions are caught before payloads hit databases. |
+| Orchestration | LangChain Core | Uses `.with_structured_output()` to bind Python classes directly to LLM tool-calling endpoints. Keeps the pipeline model-agnostic. |
+| Inference Engine | Groq API | Ultra-low latency token generation. Required for asynchronous automated triage systems that need near-instantaneous response times. |
+| Language Model | Llama 3.3 70B Versatile | Chosen over smaller 8B models. Larger parameter counts demonstrate better adherence to nested function calling and schema boundaries without syntax leakage. |
+| Interface | Streamlit | Used to prototype a side-by-side verification dashboard separating meta-reasoning output from final SQL/API-ready payload data. |
 
-| \*\*Validation Layer\*\* | \*\*Pydantic v2\*\* | Serves as a deterministic firewall. Enforces strict types (`Literal`, `Optional`, `float`, arrays) so runtime exceptions are caught \*before\* payloads hit databases. |
+---
 
-| \*\*Orchestration\*\* | \*\*LangChain Core\*\* | Utilizes `.with\_structured\_output()` to natively bind Python classes directly to LLM tool-calling endpoints, enabling model-agnostic modularity. |
+## Extracted Schemas
 
-| \*\*Inference Engine\*\* | \*\*Groq API\*\* | Provides ultra-low latency token generation, necessary for asynchronous automated triage systems requiring near-instantaneous response times. |
+### Route Decision Schema
 
-| \*\*Language Model\*\* | \*\*Llama 3.3 70B Versatile\*\* | Selected over smaller 8B parameters; massive-parameter models demonstrate superior adherence to nested function calling and schema boundaries without syntax leakage. |
-
-| \*\*Interface\*\* | \*\*Streamlit\*\* | Built to rapidly prototype side-by-side verification dashboards separating meta-reasoning routing output from final SQL/API-ready payload data. |
-
-
-
-\---
-
-
-
-\## 📦 Extracted Schemas (Example Contracts)
-
-
-
-\### 1. The Route Decision Schema
-
-Guarantees strict categorization and prevents imaginary priority tagging:
+Guarantees strict categorization and prevents the model from inventing priority levels.
 
 ```python
-
 class RouteDecision(BaseModel):
-
-&#x20;   category: Literal\["billing", "technical\_bug", "general\_inquiry"]
-
-&#x20;   urgency: Literal\["low", "medium", "high", "critical"]
-
-&#x20;   reasoning: str = Field(description="1-sentence explanation of classification.")
-
+    category: Literal["billing", "technical_bug", "general_inquiry"]
+    urgency: Literal["low", "medium", "high", "critical"]
+    reasoning: str = Field(description="1-sentence explanation of classification.")
 ```
 
+### Technical Bug Extractor Schema
 
-
-\### 2. Technical Bug Extractor Schema
-
-Transforms frustrated consumer language into Jira/Developer-ready structured data:
+Turns frustrated consumer language into structured data a developer or Jira ticket can actually use.
 
 ```python
-
 class TechnicalBugReport(BaseModel):
-
-&#x20;   issue\_summary: str
-
-&#x20;   device\_or\_os: Optional\[str] = Field(default="Unknown")
-
-&#x20;   error\_codes: List\[str] = Field(default\_factory=list)
-
-&#x20;   reproduction\_steps: List\[str] = Field(default\_factory=list)
-
-&#x20;   customer\_sentiment: Literal\["frustrated", "neutral", "confused", "angry"]
-
+    issue_summary: str
+    device_or_os: Optional[str] = Field(default="Unknown")
+    error_codes: List[str] = Field(default_factory=list)
+    reproduction_steps: List[str] = Field(default_factory=list)
+    customer_sentiment: Literal["frustrated", "neutral", "confused", "angry"]
 ```
 
+---
 
+## Local Setup
 
-\---
-
-
-
-\## 🚀 Local Installation \& Run Guide
-
-
-
-\### 1. Clone the repository
+### 1. Clone the repository
 
 ```bash
-
-git clone https://github.com/YOUR\_GITHUB\_USERNAME/structured-router-agent.git
-
+git clone https://github.com/YOUR_GITHUB_USERNAME/structured-router-agent.git
 cd structured-router-agent
-
 ```
 
-
-
-\### 2. Initialize Virtual Environment
+### 2. Initialize Virtual Environment
 
 ```bash
-
-\# Windows
-
+# Windows
 py -m venv venv
+venv\Scripts\activate
 
-venv\\Scripts\\activate
-
-
-
-\# Linux / Mac
-
+# Linux / Mac
 python3 -m venv venv
-
 source venv/bin/activate
-
 ```
 
-
-
-\### 3. Install Dependencies
+### 3. Install Dependencies
 
 ```bash
-
 pip install -r requirements.txt
-
 ```
 
+### 4. Configure Environment Variables
 
-
-\### 4. Configure Environment Variables
-
-Create a `.env` file in the project root containing your free Groq AI Key:
+Create a `.env` file in the project root with your Groq API key:
 
 ```env
-
-GROQ\_API\_KEY="gsk\_your\_api\_key\_here"
-
+GROQ_API_KEY="gsk_your_api_key_here"
 ```
 
-\*(Get a free API key at \[console.groq.com/keys](https://console.groq.com/keys))\*
+You can get a free key at https://console.groq.com/keys.
 
-
-
-\### 5. Execute Web Dashboard
+### 5. Run the App
 
 ```bash
-
-\# Windows safe command
-
+# Windows
 py -m streamlit run app.py
-
 ```
 
-\*The Streamlit visualization server will launch directly at `http://localhost:8501`.\*
+The dashboard will open at http://localhost:8501.
 
+---
 
+## Future Work
 
-\---
-
-
-
-\## 📈 Future Production Evolution (Roadmap)
-
-\* \*\*Webhook Ingestion:\*\* Replace UI with a headless FastAPI endpoint designed to asynchronously process incoming payloads directly from Gmail APIs, Zendesk, or Salesforce webhooks.
-
-\* \*\*Automated Dispatch Integration:\*\* Directly map `TechnicalBugReport` JSON outputs to \*\*Jira REST APIs\*\* for zero-touch bug ticket creation, and map `BillingInquiry` outputs to \*\*Stripe / SQL auditing logs\*\*.
-
+- Webhook Ingestion: Replace the Streamlit UI with a headless FastAPI endpoint to process incoming payloads from Gmail APIs, Zendesk, or Salesforce webhooks.
+- Automated Dispatch: Map `TechnicalBugReport` JSON outputs to the Jira REST API for zero-touch ticket creation. Map `BillingInquiry` outputs to Stripe or a SQL database for automated auditing.
 ```
-
